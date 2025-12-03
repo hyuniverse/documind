@@ -1,6 +1,6 @@
 import os
 from typing import Optional, Tuple, List, Any
-from langchain_community.document_loaders import PyPDFLoader, TextLoader
+from langchain_community.document_loaders import PDFPlumberLoader, TextLoader
 from langchain_core.document_loaders import BaseLoader
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 from langchain_chroma import Chroma
@@ -35,7 +35,7 @@ def get_loader() -> BaseLoader:
         raise FileNotFoundError(f"문서 파일을 찾을 수 없습니다: {DOCUMENT_PATH}")
     
     if DOCUMENT_PATH.endswith(".pdf"):
-        return PyPDFLoader(DOCUMENT_PATH)
+        return PDFPlumberLoader(DOCUMENT_PATH)
     elif DOCUMENT_PATH.endswith(".txt"):
         return TextLoader(DOCUMENT_PATH)
     else:
