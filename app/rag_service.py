@@ -10,11 +10,17 @@ from langchain_community.docstore.document import Document
 from langchain_openai import OpenAIEmbeddings
 from langchain_core.runnables import RunnableMap, RunnablePassthrough, Runnable
 
-# ===================================================
-# Configuration
-# ===================================================
-PERSIST_DIRECTORY: str = "./chroma_db"
-DOCUMENT_PATH: str = os.path.join(os.path.dirname(__file__), "sample.pdf")
+# 설정 파일 임포트
+from .config import (
+    PathConfig, 
+    TextSplitterConfig, 
+    LLMConfig, 
+    SearchConfig, 
+    LogConfig, 
+    PromptTemplates, 
+    ErrorMessages, 
+    SupportedFormats
+)
 
 # Global variables
 vectorstore: Optional[VectorStore] = None
@@ -31,15 +37,15 @@ def get_loader() -> BaseLoader:
         FileNotFoundError: 문서 파일이 존재하지 않는 경우
         ValueError: 지원하지 않는 파일 형식인 경우
     """
-    if not os.path.exists(DOCUMENT_PATH):
-        raise FileNotFoundError(f"문서 파일을 찾을 수 없습니다: {DOCUMENT_PATH}")
+    if not os.path.exists(PathConfig.DOCUMENT_PATH):
+        raise FileNotFoundError(ErrorMessages.FILE_NOT_FOUND.format(file_path=PathConfig.DOCUMENT_PATH))
     
-    if DOCUMENT_PATH.endswith(".pdf"):
-        return PDFPlumberLoader(DOCUMENT_PATH)
-    elif DOCUMENT_PATH.endswith(".txt"):
-        return TextLoader(DOCUMENT_PATH)
+    if any(PathConfig.DOCUMENT_PATH.endswith(ext) for ext in SupportedFormats.PDF_EXTENSIONS):
+        return PDFPlumberLoader(PathConfig.DOCUMENT_PATH)
+    elif any(PathConfig.DOCUMENT_PATH.endswith(ext) for ext in SupportedFormats.TEXT_EXTENSIONS):
+        return TextLoader(PathConfig.DOCUMENT_PATH)
     else:
-        raise ValueError("지원하지 않는 파일 형식입니다.")
+        raise ValueError(ErrorMessages.UNSUPPORTED_FILE_FORMAT)
 
 # ===================================================
 # RAG Database Initialization
@@ -55,21 +61,21 @@ def initialize_RAG_database():
     # API 키 검증
     openai_api_key = os.getenv("OPENAI_API_KEY")
     if not openai_api_key:
-        raise ValueError("OPENAI_API_KEY 환경 변수가 설정되지 않았습니다.")
+        raise ValueError(ErrorMessages.OPENAI_API_KEY_MISSING)
     
-    print(f"[RAG] API 키 확인: {openai_api_key[:20]}...")
+    print(f"[RAG] API 키 확인: {openai_api_key[:LogConfig.API_KEY_DISPLAY_LENGTH]}...")
 
     db_needs_rebuild = False
     
     # 기존 DB 존재 여부 및 상태 확인
-    if os.path.exists(PERSIST_DIRECTORY):
+    if os.path.exists(PathConfig.PERSIST_DIRECTORY):
         print("[RAG] 기존 Chroma DB 확인 중...")
         try:
             embeddings = OpenAIEmbeddings()
-            temp_vectorstore = Chroma(persist_directory=PERSIST_DIRECTORY, embedding_function=embeddings)
+            temp_vectorstore = Chroma(persist_directory=PathConfig.PERSIST_DIRECTORY, embedding_function=embeddings)
             
             # DB 유효성 검사 (테스트 검색으로 확인)
-            test_results = temp_vectorstore.similarity_search("test", k=1)
+            test_results = temp_vectorstore.similarity_search(SearchConfig.TEST_QUERY, k=1)
             
             if len(test_results) == 0:
                 print("[RAG] 기존 DB가 비어있습니다. 재생성합니다.")
@@ -89,31 +95,31 @@ def initialize_RAG_database():
     # DB 재생성 프로세스
     if db_needs_rebuild:
         # 1. 기존 DB 정리
-        if os.path.exists(PERSIST_DIRECTORY):
+        if os.path.exists(PathConfig.PERSIST_DIRECTORY):
             import shutil
-            shutil.rmtree(PERSIST_DIRECTORY)
-            print(f"[RAG] 기존 DB 폴더 삭제: {PERSIST_DIRECTORY}")
+            shutil.rmtree(PathConfig.PERSIST_DIRECTORY)
+            print(f"[RAG] 기존 DB 폴더 삭제: {PathConfig.PERSIST_DIRECTORY}")
         
         # 2. 문서 로드
-        print(f"[RAG] 문서 로드 시작: {DOCUMENT_PATH}")
+        print(f"[RAG] 문서 로드 시작: {PathConfig.DOCUMENT_PATH}")
         loader = get_loader()
         documents = loader.load()
         print(f"[RAG] {len(documents)}개 문서 로드 완료")
         
         if documents:
-            print(f"[RAG] 문서 샘플: {documents[0].page_content[:100]}...")
+            print(f"[RAG] 문서 샘플: {documents[0].page_content[:LogConfig.DOCUMENT_PREVIEW_LENGTH]}...")
 
         # 3. 문서 분할 (청킹)
         text_splitter = RecursiveCharacterTextSplitter(
-            chunk_size=800,           # 청크 크기 (토큰 수)
-            chunk_overlap=100,        # 청크 간 중복 토큰 수
-            separators=["\n\n", "\n", ".", "!", "?", ",", " ", ""]  # 분할 우선순위
+            chunk_size=TextSplitterConfig.CHUNK_SIZE,
+            chunk_overlap=TextSplitterConfig.CHUNK_OVERLAP,
+            separators=TextSplitterConfig.SEPARATORS
         )
         texts = text_splitter.split_documents(documents)
         print(f"[RAG] {len(texts)}개 청크 생성 완료")
         
         if texts:
-            print(f"[RAG] 청크 샘플: {texts[0].page_content[:100]}...")
+            print(f"[RAG] 청크 샘플: {texts[0].page_content[:LogConfig.CHUNK_PREVIEW_LENGTH]}...")
 
         # 4. 임베딩 생성 및 벡터 DB 저장
         print("[RAG] 임베딩 생성 중...")
@@ -121,10 +127,10 @@ def initialize_RAG_database():
         vectorstore = Chroma.from_documents(
             documents=texts,
             embedding=embeddings,
-            persist_directory=PERSIST_DIRECTORY
+            persist_directory=PathConfig.PERSIST_DIRECTORY
         )
 
-        print(f"[RAG] 벡터 DB 저장 완료: {PERSIST_DIRECTORY}")
+        print(f"[RAG] 벡터 DB 저장 완료: {PathConfig.PERSIST_DIRECTORY}")
         print(f"[RAG] 저장된 벡터 수: {len(texts)}")
 
 
@@ -133,7 +139,7 @@ def get_retriever():
     초기화된 벡터 스토어에서 문서 검색기를 반환합니다.
     
     Returns:
-        VectorStoreRetriever: 상위 5개 유사 문서를 검색하는 retriever
+        VectorStoreRetriever: 설정된 수만큼 유사 문서를 검색하는 retriever
         
     Raises:
         RuntimeError: 벡터 스토어가 초기화되지 않은 경우
@@ -141,9 +147,9 @@ def get_retriever():
     global vectorstore
 
     if vectorstore is None:
-        raise RuntimeError("벡터 스토어가 초기화되지 않았습니다.")
+        raise RuntimeError(ErrorMessages.VECTORSTORE_NOT_INITIALIZED)
 
-    return vectorstore.as_retriever(search_kwargs={"k": 5})
+    return vectorstore.as_retriever(search_kwargs={"k": SearchConfig.SIMILARITY_SEARCH_K})
 
 def get_qa_chain():
     """
@@ -161,10 +167,10 @@ def get_qa_chain():
         return qa_chain
     
     if vectorstore is None:
-        raise RuntimeError("벡터 스토어가 초기화되지 않았습니다.")
+        raise RuntimeError(ErrorMessages.VECTORSTORE_NOT_INITIALIZED)
     
     # LLM 및 Retriever 설정
-    llm = ChatOpenAI(temperature=0, model="gpt-3.5-turbo")
+    llm = ChatOpenAI(temperature=LLMConfig.TEMPERATURE, model=LLMConfig.MODEL)
     retriever = get_retriever()
 
     def format_prompt(inputs):
@@ -180,20 +186,14 @@ def get_qa_chain():
         question = inputs["question"]
         context_docs = inputs["context"]
         
-        # 검색된 문서들을 번호와 함께 포맷팅
-        formatted_context = ""
-        for i, doc in enumerate(context_docs, 1):
-            formatted_context += f"[문서 {i}]\n{doc.page_content}\n\n"
+        # 검색된 문서들을 포맷팅
+        formatted_context = PromptTemplates.format_context_documents(context_docs)
         
-        prompt = f"""다음은 관련 문서들입니다:
-
-{formatted_context}
-
-질문: {question}
-
-위 문서들의 내용을 바탕으로 질문에 대해 구체적이고 정확한 답변을 제공해주세요. 문서에 명시된 내용만을 기반으로 답변하고, 추측이나 일반적인 지식은 사용하지 마세요.
-
-답변:"""
+        # 템플릿을 사용하여 프롬프트 생성
+        prompt = PromptTemplates.QA_PROMPT_TEMPLATE.format(
+            context=formatted_context,
+            question=question
+        )
         return prompt
 
     # RAG 파이프라인: 문서검색 -> 프롬프트 포맷팅 -> LLM 실행
@@ -227,7 +227,7 @@ def answer_question(question: str) -> Tuple[str, List[Document]]:
     print(f"[RAG] 질문: {question}")
     
     if vectorstore is None:
-        raise RuntimeError("벡터 스토어가 초기화되지 않았습니다.")
+        raise RuntimeError(ErrorMessages.VECTORSTORE_NOT_INITIALIZED)
     
     # 1. 관련 문서 검색
     try:
@@ -237,7 +237,7 @@ def answer_question(question: str) -> Tuple[str, List[Document]]:
         
         if sources:
             for i, doc in enumerate(sources):
-                print(f"[RAG] 문서 {i+1}: {doc.page_content[:50]}...")
+                print(f"[RAG] 문서 {i+1}: {doc.page_content[:LogConfig.SEARCH_RESULT_PREVIEW_LENGTH]}...")
         else:
             print("[RAG] 경고: 검색된 문서가 없습니다!")
             
