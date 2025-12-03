@@ -4,23 +4,23 @@
 
 ## ✨ 주요 기능
 
-- 🔍 **스마트 문서 검색**: 벡터 데이터베이스를 활용한 의미 기반 문서 검색
-- 🤖 **AI 기반 답변**: OpenAI GPT 모델을 활용한 정확한 답변 생성
-- 📚 **다양한 파일 형식 지원**: PDF, TXT 파일 처리
-- 🚀 **REST API**: FastAPI 기반의 고성능 웹 API
-- ⚙️ **유연한 설정**: 환경변수를 통한 세밀한 커스터마이징
-- 📖 **문서 출처 제공**: 답변과 함께 근거가 된 문서 부분 표시
+-  **스마트 문서 검색**: 벡터 데이터베이스를 활용한 의미 기반 문서 검색
+-  **AI 기반 답변**: OpenAI GPT 모델을 활용한 정확한 답변 생성
+-  **다양한 파일 형식 지원**: PDF, TXT 파일 처리
+-  **REST API**: FastAPI 기반의 고성능 웹 API
+-  **유연한 설정**: 환경변수를 통한 세밀한 커스터마이징
+-  **문서 출처 제공**: 답변과 함께 근거가 된 문서 부분 표시
 
 ## 🏗️ 시스템 아키텍처
 
 ```
 ┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
-│   사용자 질문    │───▶│   FastAPI 서버   │───▶│   RAG Service   │
+│   사용자 질문      │───▶│   FastAPI 서버   │───▶│   RAG Service   │
 └─────────────────┘    └─────────────────┘    └─────────────────┘
                                                        │
                        ┌─────────────────┐    ┌─────────────────┐
                        │  OpenAI GPT     │◀───│  Vector Store   │
-                       │  (답변 생성)     │    │  (ChromaDB)     │
+                       │  (답변 생성)      │    │  (ChromaDB)     │
                        └─────────────────┘    └─────────────────┘
 ```
 
@@ -219,29 +219,6 @@ rm -rf chroma_db/
 - 청크 크기를 줄이세요: `RAG_CHUNK_SIZE=600`
 - 검색 문서 수를 줄이세요: `RAG_SEARCH_K=3`
 
-## 🤝 기여하기
-
-1. Fork the Project
-2. Create your Feature Branch (`git checkout -b feature/AmazingFeature`)
-3. Commit your Changes (`git commit -m 'Add some AmazingFeature'`)
-4. Push to the Branch (`git push origin feature/AmazingFeature`)
-5. Open a Pull Request
-
-## 📝 라이센스
-
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
-
-## 🙏 감사의 말
-
-- [LangChain](https://github.com/langchain-ai/langchain) - RAG 구현 프레임워크
-- [ChromaDB](https://github.com/chroma-core/chroma) - 벡터 데이터베이스
-- [FastAPI](https://github.com/tiangolo/fastapi) - 웹 API 프레임워크
-- [OpenAI](https://openai.com/) - GPT 모델 API
-
-## 📞 문의
-
-프로젝트에 대한 질문이나 제안사항이 있으시면 이슈를 생성해주세요.
-
 ---
 
-**DocuMind**로 문서 속 지식을 쉽고 빠르게 찾아보세요! 🚀
+**DocuMind**로 문서 속 지식을 쉽고 빠르게 찾아보세요!
